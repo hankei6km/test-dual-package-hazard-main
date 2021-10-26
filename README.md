@@ -1,102 +1,81 @@
-# my-starter-ts-npm-cli-and-lib
+# test-dual-package-hazard-main
 
-TypeScript で npm 用の CLI とライブラリのパッケージを作成するスターター。
-CodeSandbox 上でコードを編集し、GitHub Actions から  GitHub Packages および npm レジストリーへ publish することを想定している。
+[Dual package hazard](https://nodejs.org/api/packages.html#dual-package-hazard) を体験する。
 
-## 利用方法
+## 体験方法
 
-このリポジトリをテンプレートとして新しいリポジトリを作成する。
+[test-dual-package-hazard](https://github.com/hankei6km/test-dual-package-hazard) モジュールは[Approach #2: Isolate state](https://nodejs.org/api/packages.html#approach-2-isolate-state)を意識して `main` と `exports` が定義されている。しかし、`.js` と `.cjs` でステータスが共有されるようにはなっていない。
 
-1. `$ gh repo create <name> --template https://github.com/hankei6km/my-starter-ts-npm-cli-and-lib` で作成
-1. `package.json` と `LICENSE` 等を新しいパッケージにあわせて変更(付録にテンプレート)
-1. `$ npm run upgrade-interactive` 等でパッケージを更新
+```json
+  "main": "dist/index.cjs",
+  "exports": {
+    "import": "./dist/index.js",
+    "require": "./dist/index.cjs"
+  },
 
-作成したリポジトリを CodeSandbox でインポートすると terminal(「yarn start」タブ) 内で `start` スクリプトが実行される(通常はエラーとなる)。後は必要に応じてコードの編集等を行う。
+```
 
-テストの実行は CodeSandbox 上では `npm run csb:test` を利用する。コマンドとしての実行を試す場合は `npm run start -- foo.txt` のように実行する。
+これを他のモジュールから `import` と `require` で読み込んで利用する。
 
-### CLI 部分の変更
+```javascript
+// main.js
+#!/usr/bin/env node
+import { printCount as printCount1 } from './count1.js'
+import { printCount as printCount2 } from './count2.js'
+import { printCountCjs as printCountCjs1 } from './count1.cjs'
+import { printCountCjs as printCountCjs2 } from './count2.cjs'
 
-- コマンド名(スクリプト名)を変更: `package.json` の `bin` と`src/main.ts` の `scriptName` を変更。
-- コマンドのフラグ等を変更: `src/main.ts` を編集。
-- コマンドの処理を変更: `src/cli.ts` を編集。
+console.log('count1.js ---- ')
+printCount1()
+console.log('count1.cjs ---- ')
+printCountCjs1()
+console.log('count2.js ---- ')
+printCount2()
+console.log('count2.cjs ---- ')
+printCountCjs2()
+```
 
-### ライブラリー部分の変更
+```javascript
+// src/count1.js
+import { count, loadedAt } from '@hankei6km/test-dual-package-hazard'
+```
 
-`src/count.ts` `src/count.test.ts` `test/*` を削除し、ライブラリのコードを記述。エクスポートしたい項目を `src/index.ts` へ記述。
+```javascript
+// src/count1.cjs
+const { count, loadedAt } = require('@hankei6km/test-dual-package-hazard')
+```
 
-### npm publish
+以下のように読み込み方でステータスが異なる状態になる。
 
-以下の設定後に GitHub で Release を Publish すると Relase の種類により GitHub Pages または npm レジストリーへ `npm publish` される。
-
-- Pre Release: GitHub Pages のみに publish される
-- Release: GitHub Pages および npm レジストリーへ publish される
-
-なお、`prepublishOnly` 等は定義されていないので、手動で `npm publish` を実行してもビルドはされないので注意。
-
-#### 設定
-
-1. GitHub 上でリポジトリの "Settings / Environment" から `npm_pkg` および `gh_pkg` を作成
-1. `npm_pkg` の secrets に `NPM_TOKEN` を追加(内容は npm レジストリの Access Token)
-
-現状では、`gh_pkg` への設定変更は行わない。
-
-#### GitHub Packages へ publish
-
-GitHub で Release を Publish すると `npm publish` される。このとき、scope はリポジトリの所有者(`$GITHUB_REPOSITORY` の所有者部分)へ置き換えられる。
 
 ```console
-$ npm version prerelease
-$ git push origin
-$ gh release create v0.1.2-5 -t 0.1.2-5 --target <branch>
+$ npm run start
+count1.js ---- 
+from: count1.js loadedAt: 2021-10-26T07:06:31.874Z count: 0
+from: count1.js loadedAt: 2021-10-26T07:06:31.874Z count: 1
+from: count1.js loadedAt: 2021-10-26T07:06:31.874Z count: 2
+from: count1.js loadedAt: 2021-10-26T07:06:31.874Z count: 3
+count1.cjs ---- 
+from: count1.cjs loadedAt: 2021-10-26T07:06:31.878Z count: 0
+from: count1.cjs loadedAt: 2021-10-26T07:06:31.878Z count: 1
+from: count1.cjs loadedAt: 2021-10-26T07:06:31.878Z count: 2
+from: count1.cjs loadedAt: 2021-10-26T07:06:31.878Z count: 3
+count2.js ---- 
+from: count2.js loadedAt: 2021-10-26T07:06:31.874Z count: 4
+from: count2.js loadedAt: 2021-10-26T07:06:31.874Z count: 5
+from: count2.js loadedAt: 2021-10-26T07:06:31.874Z count: 6
+from: count2.js loadedAt: 2021-10-26T07:06:31.874Z count: 7
+count2.cjs ---- 
+from: count2.cjs loadedAt: 2021-10-26T07:06:31.878Z count: 4
+from: count2.cjs loadedAt: 2021-10-26T07:06:31.878Z count: 5
+from: count2.cjs loadedAt: 2021-10-26T07:06:31.878Z count: 6
+from: count2.cjs loadedAt: 2021-10-26T07:06:31.878Z count: 7
 ```
 
-#### npm レジストリーへ publish
+なお、今回は native ESM の javascript コードで実施しているが、`import` が `require` に変換される環境では表面化しない。
 
-GitHub で Release を Publish すると `npm publish` される。ただし Pre Release のときは Publish されない。
+ie. module=commonjs の  Typescsript の場合など。
 
-```console
-$ npm version patch
-$ git push origin
-$ gh release create v0.1.2 -t 0.1.2
-```
-
-## ESM 対応
-
-[`setup-to-native-esm`](https://github.com/hankei6km/my-starter-ts-npm-cli-and-lib/tree/topic/setup-to-native-esm) ブランチで ESM 対応を実験的に行っている。
-
-- [Pure ESM package · GitHub](https://gist.github.com/sindresorhus/a39789f98801d908bbc7ff3ecc99d99c)
-- [ESM Support | ts-jest](https://kulshekhar.github.io/ts-jest/docs/next/guides/esm-support/)
-- [Native support for ES Modules · Issue #9430 · facebook/jest · GitHub](https://github.com/facebook/jest/issues/9430#issuecomment-616232029)
-- [jest.mock does not mock an ES module without Babel · Issue #10025 · facebook/jest · GitHub](https://github.com/facebook/jest/issues/10025)
-
-## 付録
-
-`package.json` に記述する情報のテンプレート。`license` を変更したら `LICENSE` ファイルの変更も忘れずに。
-
-```
-  "name": "<package-name>",
-  "version": "0.1.0",
-  "description": "<description>",
-  "author": "user <mail addr> (website url)",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git://github.com/<user>/<repository>.git"
-  },
-  "bugs": {
-    "url": "https://github.com/<user>/<repository>/issues"
-  },
-  "keywords": []
-```
-
-## 参考
-
-- [TypeScript で npm ライブラリ開発ことはじめ - Qiita](https://qiita.com/saltyshiomix/items/d889ba79978dadba63fd)
-- [TypeScript で CLI ツールを作って、npm パッケージにする - Qiita](https://qiita.com/suzuki_sh/items/f3349efbfe1bdfc0c634)
-- [yarn upgrade-interactive と同じように npm でも対話型な更新をしたい！ - Qiita](https://qiita.com/kotarella1110/items/08afeb61d493829711eb)
-- [Node.js パッケージの公開 - GitHub Docs](https://docs.github.com/ja/actions/guides/publishing-nodejs-packages)
-- [GitHub Actions で npm に自動でリリースする workflow を作ってみた | DevelopersIO](https://dev.classmethod.jp/articles/github-actions-npm-automatic-release/)
 
 ## ライセンス
 
