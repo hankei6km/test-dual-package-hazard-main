@@ -2,9 +2,9 @@
 
 [Dual package hazard](https://nodejs.org/api/packages.html#dual-package-hazard) を体験する。
 
-## 体験方法
+## 問題のあるモジュール
 
-[test-dual-package-hazard](https://github.com/hankei6km/test-dual-package-hazard) モジュールは[Approach #2: Isolate state](https://nodejs.org/api/packages.html#approach-2-isolate-state)を意識して `main` と `exports` が定義されている。しかし、`.js` と `.cjs` でステータスが共有されるようにはなっていない。
+[test-dual-package-hazard](https://github.com/hankei6km/test-dual-package-hazard) モジュールは[Approach #2: Isolate state](https://nodejs.org/api/packages.html#approach-2-isolate-state)を意識して `main` と `exports` が定義されている。
 
 ```json
   "main": "dist/index.cjs",
@@ -12,10 +12,23 @@
     "import": "./dist/index.js",
     "require": "./dist/index.cjs"
   },
-
 ```
 
-これを他のモジュールから `import` と `require` で読み込んで利用する。
+しかし、`.cjs` は ESM 用のソースを単純に変換しただけで、ESM 側のステータスを共有するようにはなっていない。
+
+## 問題を表面化させる読み込み
+
+上記モジュールを他のモジュールから `import` と `require` で読み込んで利用する。
+
+```javascript
+// src/count1.js and src/count2.js
+import { count, loadedAt } from '@hankei6km/test-dual-package-hazard'
+```
+
+```javascript
+// src/count1.cjs and src/count2.cjs
+const { count, loadedAt } = require('@hankei6km/test-dual-package-hazard')
+```
 
 ```javascript
 // main.js
@@ -35,17 +48,9 @@ console.log('count2.cjs ---- ')
 printCountCjs2()
 ```
 
-```javascript
-// src/count1.js
-import { count, loadedAt } from '@hankei6km/test-dual-package-hazard'
-```
+## 結果
 
-```javascript
-// src/count1.cjs
-const { count, loadedAt } = require('@hankei6km/test-dual-package-hazard')
-```
-
-以下のように読み込み方でステータスが異なる状態になる。
+`import` と `require` のどちらも `@hankei6km/test-dual-package-hazard` を読み込んでいるが、その方法によってステータス(インスタンス)が異なる状態になる。
 
 
 ```console
@@ -73,8 +78,6 @@ from: count2.cjs loadedAt: 2021-10-26T07:06:31.878Z count: 7
 ```
 
 なお、今回は native ESM の javascript コードで実施しているが、`import` が `require` に変換される環境では表面化しない。
-
-ie. module=commonjs の  Typescsript の場合など。
 
 
 ## ライセンス
