@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "target": "esnext",
     "module": "commonjs",
     "moduleResolution": "node",
     "strict": true,
@@ -17,6 +16,7 @@
   ],
   "include": [
     "src/**/*.ts",
+    "test/**/*.spec.ts",
     "src/**/*.tsx"
   ]
 }
